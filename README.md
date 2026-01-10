@@ -152,6 +152,7 @@ Below is the folder and file structure of the JuneAI Soft project, with a brief 
 ```
 start.bat          # Batch file to launch the soft with the virtual environment and settings
 config.yaml        # Configuration: colors, thread count, delays
+venv/              # Python virtual environment containing installed dependencies
 src/
 ├─ main.py           # Entry point: TUI control panel, user interaction, account management
 ├─ soft.py           # Launches profiles, manages browser sessions, reads/updates points, handles auto-login
