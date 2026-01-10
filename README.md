@@ -5,7 +5,9 @@ By using this software, you take full responsibility for your actions.
 During early testing **3 out of 9 accounts were blocked due to automation**.  
 Use this software **at your own risk**.
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
 
 ## About JuneAI Soft
 
