@@ -78,7 +78,7 @@ Once all profiles are logged in:
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
-## ♻️ Updating the software (important)
+## ♻️ Updating the soft
 
 To avoid re-login after updating to a new version:
 
