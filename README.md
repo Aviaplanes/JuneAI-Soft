@@ -141,6 +141,7 @@ src/profiles.json → imapPassword
 
 Below is the folder and file structure of the JuneAI Soft project, with a brief description of each file:
 ```
+start.bat          # Batch file to launch the soft with the virtual environment and settings
 config.yaml        # Configuration: colors, thread count, delays
 src/
 ├─ main.py           # Entry point: TUI control panel, user interaction, account management
