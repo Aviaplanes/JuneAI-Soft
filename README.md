@@ -205,3 +205,5 @@ src/
 
 ## ⭐ Support
 If this project helped you — consider starring the repository 🙂
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
