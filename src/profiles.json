@@ -1,0 +1,23 @@
+[
+  {
+    "email": "aviasales@gmail.com",
+    "points": 22491,
+    "login": false,
+    "proxy": "",
+    "imapPassword": "abcd abcd abcd abcd"
+  },
+  {
+    "email": "aviasales@gmail.com",
+    "points": 2222,
+    "login": false,
+    "proxy": "",
+    "imapPassword": ""
+  },
+  {
+    "email": "aviasales@gmail.com",
+    "points": 0,
+    "login": true,
+    "proxy": "",
+    "imapPassword": ""
+  }
+]
