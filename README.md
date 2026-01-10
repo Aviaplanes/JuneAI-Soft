@@ -143,6 +143,7 @@ Below is the folder and file structure of the JuneAI Soft project, with a brief 
 
 src/
 ├─ main.py           # Entry point: TUI control panel, user interaction, account management
+
 ├─ soft.py           # Launches profiles, manages browser sessions, reads/updates points, handles auto-login
 ├─ launcher.py       # Runs multiple profiles in parallel with thread limits and delays
 ├─ grind.py          # Automates actions for points farming: text, image, video
