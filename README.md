@@ -1,4 +1,4 @@
-# <img src="icons/juneai.png" width="20" /> June AI Soft
+# <img src="icons/juneai.png" width="25" /> June AI Soft
 
 ⚠️ **DISCLAIMER**  
 By using this software, you take full responsibility for your actions.  
