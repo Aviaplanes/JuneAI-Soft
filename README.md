@@ -137,13 +137,13 @@ src/profiles.json → imapPassword
 
 ---
 
+```
 ## 🗂️ Project Structure
 
 Below is the folder and file structure of the JuneAI Soft project, with a brief description of each file:
 
 src/
 ├─ main.py           # Entry point: TUI control panel, user interaction, account management
-
 ├─ soft.py           # Launches profiles, manages browser sessions, reads/updates points, handles auto-login
 ├─ launcher.py       # Runs multiple profiles in parallel with thread limits and delays
 ├─ grind.py          # Automates actions for points farming: text, image, video
@@ -160,6 +160,8 @@ src/
 ├─ profiles/          # Contains profile folders with cookies/session data
 ├─ profiles.json      # Stores account info: email, points, login state, proxy, imapPassword
 └─ config.yaml        # Configuration: colors, thread count, delays
+```
+
 
 ---
 
