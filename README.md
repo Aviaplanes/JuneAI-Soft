@@ -1,4 +1,4 @@
-# 🚀 June AI Soft
+# <img src="icons/june.png" width="20" /> June AI Soft
 
 ⚠️ **DISCLAIMER**  
 By using this software, you take full responsibility for your actions.  
