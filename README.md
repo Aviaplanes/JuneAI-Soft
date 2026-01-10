@@ -126,7 +126,9 @@ Example:
   ⚠️ Barely tested — you may need to adjust logic (`soft.py`, line ~89)
 - **imapPassword** — IMAP app password for auto-login
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
 
 ## ⚙️ Configuration
 
@@ -136,7 +138,9 @@ You can customize colors and some settings in:
 config.yaml
 ```
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
 
 ## 📬 IMAP Auto-login Guide (Gmail)
 
@@ -163,7 +167,9 @@ src/profiles.json → imapPassword
 - Use fresh or warmed accounts
 - Proxies are recommended for large-scale usage
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
 
 ## 🗂️ Project Structure
 
@@ -191,7 +197,9 @@ src/
 └─ profiles.json      # Stores account info: email, points, login state, proxy, imapPassword
 ```
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
 
 ## ⭐ Support
 If this project helped you — consider starring the repository 🙂
