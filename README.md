@@ -38,8 +38,6 @@ Install **Python 3.13.3** and **make sure to add it to PATH**.
 
 🔗 Download: https://www.python.org/downloads/
 
----
-
 ### 2️⃣ Install dependencies
 
 After installing Python, run:
@@ -49,8 +47,6 @@ After installing Python, run:
 
 ⚠️ **Both steps are mandatory**
 
----
-
 ### 3️⃣ Add accounts
 Open the file:
 
@@ -59,8 +55,6 @@ src/profiles.json
 ```
 
 Add emails associated with your **June** accounts.
-
----
 
 ### 4️⃣ First launch & login
 Start the software **only via**:
@@ -77,13 +71,12 @@ Steps inside the app:
 3. Register or log in to the corresponding **June** account  
    - Profile email **must match** the June account email
 
----
-
 ### 5️⃣ Start farming
 Once all profiles are logged in:
 - Select **Start farm** from the menu
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 
 ## ♻️ Updating the software (important)
 
