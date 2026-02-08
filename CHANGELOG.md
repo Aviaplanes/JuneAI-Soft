@@ -2,17 +2,23 @@
 
 ---
 
+## [v2.1.6] - 7th February 2026
+- Added background auto-clicker for dismissing popup overlays (tour guide, cookie consent, modals) that block script actions. Automatically clicks close buttons as soon as they appear on the page
+- Fixed grind script launching on accounts that are not logged in. Now it only starts when the account is authenticated (points element on the page has a value of 1+)
+- Fixed incorrect function name call in the farm function that caused the script to crash with an error
+- Fixed welcome tour overlay blocking script execution, which previously required manual dismissal
+
 ## [v2.1.5] - 10th January 2026
-- Soft has been translated into English
-- GPU, UserAgent, and screen resolution rotation modules removed due to redundancy
-- Soft updated for general release
-- README.md has been updated
+- Added English translation for the entire soft
+- Added updated README.md with new documentation
+- Updated soft for general release
+- Removed GPU, UserAgent, and screen resolution rotation modules due to redundancy
 
 ## [v2.1.4] - 19th December 2025
 - Fixed various bugs
 
 ## [v2.1.3] - 12th December 2025
-- Software adapted for the new UI update
+- Fixed compatibility with the new UI update
 
 ## [v2.1.2] - 12th November 2025
 - Added file with prompts for video (**prompts/videos.txt**)
