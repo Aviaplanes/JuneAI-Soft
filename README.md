@@ -43,7 +43,8 @@ Install **Python 3.13.3** and **make sure to add it to PATH**.
 After installing Python, run:
 
 - `install.bat` — installs required Python dependencies  
-- `install browser.bat` — installs the browser required for the software  
+- `install_browser.bat` — installs the browser required for the software  
+- `cleanup.bat` — removes files and folders that are no longer needed after setup (readme, icons folder for github readme, changelog, ...)
 
 ⚠️ **Both steps are mandatory**
 
