@@ -1,13 +1,12 @@
 """
 This file is called first and contains the logic for user interaction – a TUI control panel
 """
+
 import json
 import os
-import sys
 import time
-from pathlib import Path
-
 from collections.abc import Sequence
+from pathlib import Path
 from typing import TypedDict
 
 import InquirerPy.inquirer as inquirer
@@ -313,7 +312,7 @@ def main() -> None:
         render_accounts_panel(profiles)
 
         choice = select_menu(
-            f"? Select an action (use ↑↓ arrows):",
+            "? Select an action (use ↑↓ arrows):",
             [
                 "Start farm",
                 "Launch profile",
