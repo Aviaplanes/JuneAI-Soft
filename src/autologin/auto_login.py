@@ -1,8 +1,6 @@
 """
 This file contains the auto-login logic for profiles that are not logged in
 """
-import os
-import sys
 
 import asyncio
 import math

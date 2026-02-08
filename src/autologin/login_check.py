@@ -1,6 +1,7 @@
 """
 This file contains the logic for modifying the 'login' setting in a profile
 """
+
 import json
 from pathlib import Path
 
@@ -8,16 +9,18 @@ from pathlib import Path
 def set_login_true(email: str) -> None:
     _set_login(email, True)
 
+
 def set_login_false(email: str) -> None:
     _set_login(email, False)
 
-def _set_login(email: str, value: str) -> None:
+
+def _set_login(email: str, value: bool) -> None:
     path = Path(__file__).resolve().parent.parent / "profiles.json"
     try:
         data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
     except Exception:
         data = []
-        
+
     changed = False
     if isinstance(data, list):
         for item in data:

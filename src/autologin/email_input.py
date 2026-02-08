@@ -1,8 +1,6 @@
 """
 This file contains the logic for entering email into the input field
 """
-import os
-import sys
 
 import asyncio
 import random
