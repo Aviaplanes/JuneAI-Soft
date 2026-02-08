@@ -1,23 +1,17 @@
 """
-This file contains the logic for launching profiles, configuring their startup, and reading points 
+This file contains the logic for launching profiles, configuring their startup, and reading points
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
-import os
-import random
 import re
-import sys
-import time
 from pathlib import Path
-from typing import Optional
 from urllib.parse import urlparse
 
-
-import win32con
-import win32gui
 import yaml
+from playwright.async_api import BrowserContext
 from rich.color import Color, ColorParseError
 from rich.console import Console
 
@@ -27,37 +21,35 @@ from autologin import (
     set_login_false,
     set_login_true,
 )
-from grind import (
-    key_press, 
-    main, 
-    type, 
-    wait
-)
+from grind import dismiss_tour_overlay, key_press, main, type, wait
 from imap import get_code
 
 console = Console()
 
 hue = 300  # magenta
 direction = 1  # 1 = Increasing, -1 = Decreasing
-step = 2  
+step = 2
+
 
 def hue_to_hex(h):
-    # Converts H (0-360) to HEX color via HSL 
+    # Converts H (0-360) to HEX color via HSL
     import colorsys
-    r, g, b = colorsys.hls_to_rgb(h/360, 0.5, 1)
-    return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
+
+    r, g, b = colorsys.hls_to_rgb(h / 360, 0.5, 1)
+    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
+
 
 def next_color():
     global hue, direction
     hue += step * direction
-    
+
     if hue > 300:
-        hue = 300 - (hue - 300) 
+        hue = 300 - (hue - 300)
         direction = -1
     elif hue < 220:
         hue = 220 + (220 - hue)
         direction = 1
-        
+
     return hue_to_hex(hue)
 
 
@@ -119,7 +111,6 @@ def _write_profiles_json(path: Path, data: list) -> None:
     tmp.replace(path)
 
 
-
 def _profile_dir_for_email(email: str) -> str:
     base_dir = Path(__file__).resolve().parent / "profiles"
     base_dir.mkdir(exist_ok=True)
@@ -160,16 +151,13 @@ def update_points_and_log(email: str, points: int) -> None:
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(path)
-        try:
-            local_part = email.split("@", 1)
-        except ValueError:
-            local_part = email, ""
-        difference = points - prev_points
-        color = next_color() 
-        console.print(f"[{color}]ASKJUNE[/{color}] {email} | [{color}]+{difference}[/{color}] pts")
 
+        difference = points - (prev_points or 0)
+        color = next_color()
+        console.print(
+            f"[{color}]ASKJUNE[/{color}] {email} | [{color}]+{difference}[/{color}] pts"
+        )
 
-   
 
 async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> None:
     try:
@@ -187,15 +175,15 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
 
     retries = int(config.get("retries", 3))
     attempt = 0
-
     while attempt < retries:
         attempt += 1
+        context: BrowserContext | None = None
+
         try:
             async with async_playwright() as p:
-
                 user_data_dir = _profile_dir_for_email(email)
                 proxy = _get_proxy_for_email(email)
-                
+
                 context = await p.chromium.launch_persistent_context(
                     user_data_dir=user_data_dir,
                     headless=False,
@@ -216,8 +204,6 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
                     continue
 
                 page.set_default_timeout(30000)
-
-                
 
                 async def handle_response(response):
                     try:
@@ -244,6 +230,8 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
                     )
                     await context.close()
                     continue
+
+                tour_task = asyncio.create_task(dismiss_tour_overlay(page))
 
                 points_selector = "span.tabular-nums"
                 signin_selector = 'button:has-text("Sign in")'
@@ -282,6 +270,7 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
                     current_points = await points_element.inner_text()
                     console.print(f"{email} | current points: {current_points}")
                     set_login_true(email)
+                    can_grind = True
 
                 elif signin_element:
                     set_login_false(email)
@@ -299,8 +288,8 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
                     )
                     if profile and "imapPassword" in profile:
                         try:
-                            code = get_blockchain_code(email)
-                            await type(page, code)
+                            code = get_code(email)
+                            await type(page, code or "")
                             await key_press(page, "Enter")
                         except RuntimeError as e:
                             if "imapPassword not found" in str(e):
@@ -310,12 +299,28 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
                             else:
                                 raise
 
+                    try:
+                        await page.wait_for_selector(
+                            "span.tabular-nums", state="visible", timeout=30000
+                        )
+                        current_points = await page.inner_text("span.tabular-nums")
+                        console.print(f"{email} | logged in, points: {current_points}")
+                        set_login_true(email)
+                        can_grind = True
+                    except Exception:
+                        console.print(
+                            f"{email} | Login failed, points not found",
+                            style=warnColor,
+                        )
+                        can_grind = False
+
                 else:
                     console.print(
                         f"{email} | Element 'points' and 'Sign in' button not found",
                         style=warnColor,
                     )
-                    await context.close()
+                    if context is not None:
+                        await context.close()
                     continue
 
                 await page.evaluate("(email) => { document.title = email; }", email)
@@ -349,7 +354,21 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
                 page_closed = asyncio.Event()
                 page.on("close", lambda: page_closed.set())
 
-                result = await main(page, email)
+                # ===== ГРИНД ТОЛЬКО ЕСЛИ ЗАЛОГИНЕН =====
+                if can_grind:
+                    result = await main(page, email)
+                else:
+                    console.print(
+                        f"{email} | Skipping grind — not logged in",
+                        style=warnColor,
+                    )
+                    result = None
+                tour_task.cancel()
+                try:
+                    await tour_task
+                except asyncio.CancelledError:
+                    pass
+
                 if result == "close":
                     console.print(f"[INFO] {email} | Farming completed", style=logColor)
                     break
@@ -360,10 +379,13 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
             console.print(
                 f"{email} | Error on attempt {attempt}/{retries}: {e}", style=warnColor
             )
-            try:
-                await context.close()
-            except Exception:
-                pass
+
+            if context is not None:
+                try:
+                    await context.close()
+                except Exception:
+                    pass
+
             if attempt >= retries:
                 console.print(
                     f"{email} | All attempts exhausted",
@@ -399,7 +421,6 @@ async def _run_profile_async(email: str, wait_for_close: bool = True) -> None:
         return
 
     async with async_playwright() as p:
-
         user_data_dir = _profile_dir_for_email(email)
         proxy = _get_proxy_for_email(email)
 
@@ -410,15 +431,10 @@ async def _run_profile_async(email: str, wait_for_close: bool = True) -> None:
             locale="en-US",
             timezone_id="Europe/London",
             proxy=proxy if proxy else None,
-            args=["--no-sandbox", 
-                "--disable-dev-shm-usage", 
-                "--use-gl=desktop"
-                ],
+            args=["--no-sandbox", "--disable-dev-shm-usage", "--use-gl=desktop"],
         )
 
         page = context.pages[0] if context.pages else await context.new_page()
-
-      
 
         async def safe_parse_json(response):
             try:
@@ -455,7 +471,6 @@ async def _run_profile_async(email: str, wait_for_close: bool = True) -> None:
         page.on("response", handle_response)
         await page.goto("https://askjune.ai/app/chat")
 
-
         button = await page.query_selector('button:has-text("Sign in")')
         if button:
             set_login_false(email)
@@ -476,8 +491,8 @@ async def _run_profile_async(email: str, wait_for_close: bool = True) -> None:
             profile = next((p for p in profiles if p.get("email") == email), None)
             if profile and "imapPassword" in profile:
                 try:
-                    code = get_blockchain_code(email)
-                    await type(page, code)
+                    code = get_code(email)
+                    await type(page, code or "")
                     await key_press(page, "Enter")
                 except RuntimeError as e:
                     if "не найден imapPassword" in str(e):

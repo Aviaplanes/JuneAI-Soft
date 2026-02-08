@@ -1,13 +1,11 @@
 """
 This file handles the parallel execution of profiles – running multiple browsers simultaneously
 """
-import os
-import sys
 
 import asyncio
 import json
-from pathlib import Path
 import random
+from pathlib import Path
 
 import yaml
 from rich.color import Color, ColorParseError
@@ -19,16 +17,13 @@ from grind import wait
 console = Console()
 
 
-
 def parse_hms(time_str: str) -> int:
-    # Parses a 'HH:MM:SS' string into seconds 
+    # Parses a 'HH:MM:SS' string into seconds
     try:
         h, m, s = map(int, time_str.split(":"))
         return h * 3600 + m * 60 + s
-    except:
+    except Exception:
         return 0
-    
-
 
 
 def safe_style(value: str | None, fallback: str = "#404040") -> str:
@@ -61,10 +56,8 @@ start_delay_cfg = config.get("startDelay", ["00:00:00", "00:00:00"])
 try:
     min_delay = parse_hms(start_delay_cfg[0])
     max_delay = parse_hms(start_delay_cfg[1])
-except:
+except Exception:
     min_delay, max_delay = 0, 0
-
-
 
 
 async def random_start_delay():
@@ -72,8 +65,6 @@ async def random_start_delay():
         await asyncio.sleep(min_delay)
     else:
         await asyncio.sleep(random.randint(min_delay, max_delay))
-
-
 
 
 def load_accounts(path: str = "profiles.json") -> list[str]:
@@ -136,10 +127,8 @@ async def _launch_all_async(emails: list[str]) -> None:
                 sem.release()
                 await random_start_delay()
 
-
         tasks.append(asyncio.create_task(_runner()))
         await random_start_delay()
-
 
     await asyncio.gather(*tasks, return_exceptions=True)
 

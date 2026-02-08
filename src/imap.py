@@ -1,6 +1,7 @@
 """
 This file handles all IMAP logic – it retrieves and returns codes from email
 """
+
 import imaplib
 import json
 import os
@@ -47,7 +48,7 @@ def _get_password_for_email(email: str, path: str = PROFILES_FILENAME) -> str:
 
     for p in data:
         if isinstance(p, dict) and p.get("email") == email:
-            return p.get("imapPassword")
+            return p.get("imapPassword", "")
 
     raise RuntimeError(f"Email {email} not found in {path}")
 
@@ -91,7 +92,10 @@ def get_code(
                 continue
 
             raw_header = fetched[0][1] or b""
-            subject = _decode_subject(raw_header)
+            if isinstance(raw_header, bytes):
+                subject = _decode_subject(raw_header)
+            else:
+                subject = ""
             m = re.search(r"(\d{6})", subject)
             if m:
                 return m.group(1)
@@ -101,4 +105,3 @@ def get_code(
             imap.logout()
         except Exception:
             pass
-            

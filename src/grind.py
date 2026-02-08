@@ -1,13 +1,10 @@
 """
 This file handles all automated actions for points farming and includes all three farming types – text, images, and video
 """
-import os
-import sys
 
 import asyncio
 import random
 from pathlib import Path
-from typing import Union
 
 import playwright._impl._errors as pw_errors
 import yaml
@@ -16,6 +13,29 @@ from rich.color import Color, ColorParseError
 from rich.console import Console
 
 console = Console()
+
+
+async def dismiss_tour_overlay(page: Page, interval: float = 0.5) -> None:
+    """
+    Фоновая задача: закрывает всплывающие окна (тур, модалки).
+    Работает пока страница открыта.
+    """
+    selectors = [
+        "button.reactour__close-button",
+        'button[aria-label="Continue with selected mode"]',
+        "#CybotCookiebotDialogBodyButtonAccept",
+    ]
+
+    while not page.is_closed():
+        for selector in selectors:
+            try:
+                button = await page.query_selector(selector)
+                if button:
+                    await button.click(force=True)
+                    await asyncio.sleep(0.3)
+            except Exception:
+                pass
+        await asyncio.sleep(interval)
 
 
 async def wait_for_update(
@@ -96,7 +116,12 @@ async def new_chat(
     if page.is_closed():
         return False
 
-    box = await element.bounding_box() if element is not None else None
+    if element is None:
+        return False
+
+    box = await element.bounding_box()
+    if box is None:
+        return False
 
     start_x, start_y = random.uniform(0, 200), random.uniform(0, 200)
     end_x = box["x"] + box["width"] / 2
@@ -130,9 +155,9 @@ async def click_mode(
 
     # selectors use SVG path attributes to find the desired button
     selectors = {
-        "text": 'button:has(svg.lucide-message-circle)',
-        "images": 'button:has(svg.lucide-image)',
-        "videos": 'button:has(svg.lucide-tv-minimal-play)',
+        "text": "button:has(svg.lucide-message-circle)",
+        "images": "button:has(svg.lucide-image)",
+        "videos": "button:has(svg.lucide-tv-minimal-play)",
     }
 
     selector = selectors.get(mode)
@@ -149,7 +174,9 @@ async def click_mode(
             return False
         await element.click(force=True)
     except TimeoutError:
-        print(f"[WARN] {email} | Mode '{mode}' element did not appear within {timeout} ms")
+        print(
+            f"[WARN] {email} | Mode '{mode}' element did not appear within {timeout} ms"
+        )
     except Exception as e:
         if not page.is_closed():
             print(f"[ERROR] {email} | Failed to click mode '{mode}': {e}")
@@ -247,7 +274,7 @@ async def wait_for_points_or_limit(
     return False
 
 
-async def grind(page: Page, timeout: int, email, prompt_file: str) -> bool:
+async def grind(page: Page, timeout: int, email, prompt_file: str) -> bool | str:
     last_points = 0
     while True:
         if page.is_closed():
@@ -327,9 +354,7 @@ async def grind(page: Page, timeout: int, email, prompt_file: str) -> bool:
 
             limit = await check_limit_reached(page)
             if limit:
-                console.print(
-                    f"[INFO] {email} | Usage limit reached", style=logColor
-                )
+                console.print(f"[INFO] {email} | Usage limit reached", style=logColor)
                 await wait(0.2, 0.411)
                 if page.is_closed():
                     return False
@@ -357,22 +382,34 @@ async def main(page: Page, email) -> bool | str | None:
     if page.is_closed():
         return False
 
-    await click_mode(page, "text", email)
-    result = await grind(page, 60, email, "prompts/text.txt")
+    # Запускаем фоновый "убийца" тура — не блокирует основной код
+    tour_task = asyncio.create_task(dismiss_tour_overlay(page))
 
-    if page.is_closed():
-        return False
+    try:
+        await click_mode(page, "text", email)
+        result = await grind(page, 60, email, "prompts/text.txt")
 
-    await click_mode(page, "images", email)
-    result = await grind(page, 60, email, "prompts/images.txt")
+        if page.is_closed():
+            return False
 
-    if page.is_closed():
-        return False
+        await click_mode(page, "images", email)
+        result = await grind(page, 60, email, "prompts/images.txt")
 
-    await click_mode(page, "videos", email)
-    result = await grind(page, 60, email, "prompts/videos.txt")
+        if page.is_closed():
+            return False
 
-    if page.is_closed():
-        return False
+        await click_mode(page, "videos", email)
+        result = await grind(page, 60, email, "prompts/videos.txt")
 
-    return result
+        if page.is_closed():
+            return False
+
+        return result
+
+    finally:
+        # Останавливаем фоновую задачу когда main завершился
+        tour_task.cancel()
+        try:
+            await tour_task
+        except asyncio.CancelledError:
+            pass
