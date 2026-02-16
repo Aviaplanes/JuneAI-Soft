@@ -4,13 +4,16 @@ This file handles all automated actions for points farming and includes all thre
 
 import asyncio
 import random
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import playwright._impl._errors as pw_errors
-import yaml
 from playwright.async_api import Page, TimeoutError
 from rich.color import Color, ColorParseError
 from rich.console import Console
+
+import config
 
 console = Console()
 
@@ -72,17 +75,8 @@ def safe_style(value: str | None, fallback: str = "#404040") -> str:
         return fallback
 
 
-config_path = Path(__file__).parent.parent / "config.yaml"
-
-try:
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-except FileNotFoundError:
-    config = {}
-
-
-logColor = safe_style(config.get("logColor"), "#404040")
-warnColor = safe_style(config.get("warnColor"), "#b84c44")
+logColor = safe_style(config.logColor, "#404040")
+warnColor = safe_style(config.warnColor, "#b84c44")
 
 
 async def wait(*args: float) -> None:
@@ -163,7 +157,7 @@ async def click_mode(
     selector = selectors.get(mode)
 
     if not selector:
-        print(f"[ERROR] {email} | Неизвестный режим: {mode}")
+        print(f"[ERROR] {email} | unknown mode: {mode}")
         return False
 
     try:
@@ -171,6 +165,8 @@ async def click_mode(
             selector, timeout=timeout, state="visible"
         )
         if page.is_closed():
+            return False
+        if element is None:
             return False
         await element.click(force=True)
     except TimeoutError:
@@ -184,9 +180,7 @@ async def click_mode(
 
 
 async def check_limit_reached(page: Page) -> bool:
-    element = await page.query_selector(
-        'div:has-text("You have reached your 5-hour usage limit")'
-    )
+    element = await page.query_selector('div:has-text("Usage Limit Reached")')
     return element is not None
 
 
@@ -259,7 +253,7 @@ async def type(page: Page, text: str) -> bool:
 
 
 async def wait_for_points_or_limit(
-    page: Page, check_points_func, timeout: float = 18.0
+    page: Page, check_points_func: Callable[[], bool], timeout: float = 18.0
 ) -> bool:
     elapsed = 0
     interval = 0.1
@@ -274,7 +268,7 @@ async def wait_for_points_or_limit(
     return False
 
 
-async def grind(page: Page, timeout: int, email, prompt_file: str) -> bool | str:
+async def grind(page: Page, timeout: int, email: str, prompt_file: str) -> bool | str:
     last_points = 0
     while True:
         if page.is_closed():
@@ -298,9 +292,13 @@ async def grind(page: Page, timeout: int, email, prompt_file: str) -> bool | str
             if not element:
                 continue
 
-            cursor_style = await page.evaluate(
-                "(el) => window.getComputedStyle(el).cursor", element
+            cursor_style = cast(
+                str,
+                await page.evaluate(
+                    "(el) => window.getComputedStyle(el).cursor", element
+                ),
             )
+
             if cursor_style == "not-allowed":
                 console.print(
                     "[WARN] Element is not clickable (cursor: not-allowed)",
@@ -358,7 +356,7 @@ async def grind(page: Page, timeout: int, email, prompt_file: str) -> bool | str
                 await wait(0.2, 0.411)
                 if page.is_closed():
                     return False
-                await new_chat(page)
+                _ = await new_chat(page)
                 return True
             try:
                 raw = await page.inner_text("span.tabular-nums")
@@ -369,7 +367,7 @@ async def grind(page: Page, timeout: int, email, prompt_file: str) -> bool | str
             if new_points != current_points:
                 last_points = new_points
                 await wait(0.5, 2)
-                await new_chat(page)
+                _ = await new_chat(page)
                 break
 
             await asyncio.sleep(interval)
@@ -378,7 +376,7 @@ async def grind(page: Page, timeout: int, email, prompt_file: str) -> bool | str
             return "close"
 
 
-async def main(page: Page, email) -> bool | str | None:
+async def main(page: Page, email: str) -> bool | str | None:
     if page.is_closed():
         return False
 
@@ -386,19 +384,19 @@ async def main(page: Page, email) -> bool | str | None:
     tour_task = asyncio.create_task(dismiss_tour_overlay(page))
 
     try:
-        await click_mode(page, "text", email)
+        _ = await click_mode(page, "text", email)
         result = await grind(page, 60, email, "prompts/text.txt")
 
         if page.is_closed():
             return False
 
-        await click_mode(page, "images", email)
+        _ = await click_mode(page, "images", email)
         result = await grind(page, 60, email, "prompts/images.txt")
 
         if page.is_closed():
             return False
 
-        await click_mode(page, "videos", email)
+        _ = await click_mode(page, "videos", email)
         result = await grind(page, 60, email, "prompts/videos.txt")
 
         if page.is_closed():
@@ -408,7 +406,7 @@ async def main(page: Page, email) -> bool | str | None:
 
     finally:
         # Останавливаем фоновую задачу когда main завершился
-        tour_task.cancel()
+        _ = tour_task.cancel()
         try:
             await tour_task
         except asyncio.CancelledError:

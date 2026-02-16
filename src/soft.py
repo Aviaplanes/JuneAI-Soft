@@ -26,31 +26,42 @@ from imap import get_code
 
 console = Console()
 
-hue = 300  # magenta
-direction = 1  # 1 = Increasing, -1 = Decreasing
-step = 2
+# Gradient settings
+color1 = "#f40752"  # magenta (was hue 300)
+color2 = "#f9ab8f"  # blue (was hue 220)
+position = 0
+direction = 1  # 1 = toward color2, -1 = toward color1
+steps = 40  # smoothness of gradient
 
 
-def hue_to_hex(h):
-    # Converts H (0-360) to HEX color via HSL
-    import colorsys
-
-    r, g, b = colorsys.hls_to_rgb(h / 360, 0.5, 1)
-    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
+def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    """Convert hex color to RGB tuple"""
+    h = hex_color.lstrip("#")
+    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 
-def next_color():
-    global hue, direction
-    hue += step * direction
+def _interpolate(t: float) -> str:
+    """Linearly interpolate between color1 and color2"""
+    rgb1 = _hex_to_rgb(color1)
+    rgb2 = _hex_to_rgb(color2)
+    r = rgb1[0] + (rgb2[0] - rgb1[0]) * t
+    g = rgb1[1] + (rgb2[1] - rgb1[1]) * t
+    b = rgb1[2] + (rgb2[2] - rgb1[2]) * t
+    return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
 
-    if hue > 300:
-        hue = 300 - (hue - 300)
+
+def next_color() -> str:
+    """Get next color in the repeating gradient cycle"""
+    global position, direction
+
+    t = position / steps
+    color = _interpolate(t)
+
+    position += direction
+    if position >= steps:
         direction = -1
-    elif hue < 220:
-        hue = 220 + (220 - hue)
+    elif position <= 0:
         direction = 1
-
-    return hue_to_hex(hue)
 
 
 def safe_style(value: str | None, fallback: str = "#404040") -> str:
@@ -325,7 +336,8 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
 
                 await page.evaluate("(email) => { document.title = email; }", email)
 
-                await page.evaluate(r"""
+                await page.evaluate(
+                    r"""
                 (() => {
                     if (window.__pointsWatcherInstalled) return;
                     window.__pointsWatcherInstalled = true;
@@ -349,7 +361,8 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
                     const poll = () => { attach(); if (observedEl) { const v = parse(observedEl); if (v != null && v !== lastVal) { lastVal = v; notify(v); } } };
                     setInterval(poll, 1000); attach(); poll();
                 })();
-                """)
+                """
+                )
 
                 page_closed = asyncio.Event()
                 page.on("close", lambda: page_closed.set())
@@ -514,7 +527,8 @@ async def _run_profile_async(email: str, wait_for_close: bool = True) -> None:
 
         await page.evaluate("(email) => { document.title = email; }", email)
 
-        await page.evaluate(r"""
+        await page.evaluate(
+            r"""
         (() => {
         if (window.__pointsWatcherInstalled) return;
         window.__pointsWatcherInstalled = true;
@@ -554,7 +568,8 @@ async def _run_profile_async(email: str, wait_for_close: bool = True) -> None:
           attach();
           poll();
         })();
-        """)
+        """
+        )
 
         button = await page.query_selector('button:has-text("Sign in")')
         if button:
