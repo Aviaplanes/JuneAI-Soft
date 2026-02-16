@@ -14,7 +14,7 @@ Use this software **at your own risk**.
 
 
 
-## About JuneAI Soft
+## About JuneAI Soft 
 
 **JuneAI Soft** is a fully automated tool for farming points in the **JuneAI** project. Originally created for personal use, it is now shared on GitHub as a portfolio project. These points can potentially be used for project airdrops.
 
@@ -26,6 +26,8 @@ Use this software **at your own risk**.
 - Switches seamlessly between different request modules for maximum efficiency.
 
 **JuneAI Soft** saves time, simplifies multi-account management, and provides a transparent interface for point farming.
+
+developed on Windows 10/11
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
