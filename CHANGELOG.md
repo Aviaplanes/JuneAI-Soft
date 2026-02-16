@@ -2,6 +2,9 @@
 
 ---
 
+## [v2.1.7] - x
+- Replaced `config.yaml` with `config.py` for configuration. Eliminates `pyyaml` dependency, provides full type safety, IDE autocompletion, and instant error detection on typos
+
 ## [v2.1.6] - 7th February 2026
 - Added background auto-clicker for dismissing popup overlays (tour guide, cookie consent, modals) that block script actions. Automatically clicks close buttons as soon as they appear on the page
 - Fixed grind script launching on accounts that are not logged in. Now it only starts when the account is authenticated (points element on the page has a value of 1+)
