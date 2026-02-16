@@ -5,12 +5,11 @@ This file handles the parallel execution of profiles – running multiple browse
 import asyncio
 import json
 import random
-from pathlib import Path
 
-import yaml
 from rich.color import Color, ColorParseError
 from rich.console import Console
 
+import config
 import soft
 from grind import wait
 
@@ -38,20 +37,13 @@ def safe_style(value: str | None, fallback: str = "#404040") -> str:
         return fallback
 
 
-config_path = Path(__file__).parent.parent / "config.yaml"
+logColor = safe_style(config.logColor, "#404040")
+warnColor = safe_style(config.warnColor, "#b84c44")
 
-try:
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-except FileNotFoundError:
-    config = {}
-
-logColor = safe_style(config.get("logColor"), "#404040")
-warnColor = safe_style(config.get("warnColor"), "#b84c44")
-THREAD_LIMIT = int(config.get("threadCount", 3))
+THREAD_LIMIT = config.threadCount
 
 
-start_delay_cfg = config.get("startDelay", ["00:00:00", "00:00:00"])
+start_delay_cfg = config.startDelay
 
 try:
     min_delay = parse_hms(start_delay_cfg[0])

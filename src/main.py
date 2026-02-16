@@ -10,13 +10,13 @@ from pathlib import Path
 from typing import TypedDict
 
 import InquirerPy.inquirer as inquirer
-import yaml
 from rich import box
 from rich.color import Color, ColorParseError
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+import config
 import soft
 from autologin import set_login_false
 from launcher import launch_all
@@ -60,15 +60,7 @@ def safe_style(value: str | None, fallback: str = "magenta2") -> str:
         return fallback
 
 
-config_path = Path(__file__).parent.parent / "config.yaml"
-
-try:
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-except FileNotFoundError:
-    config = {}
-
-logColor = safe_style(config.get("logColor"), "#404040")
+logColor = safe_style(config.logColor, "#404040")
 
 
 def cls() -> None:
@@ -157,8 +149,8 @@ def load_accounts_with_points(path: str = "profiles.json") -> list[Account]:
 
 def render_accounts_panel(accounts: Sequence[Account]) -> None:
     console = Console()
-    frameColor = safe_style(config.get("frameColor"), "slate_blue3")
-    pointsColor = safe_style(config.get("pointsColor"), "magenta2")
+    frameColor = safe_style(config.frameColor, "slate_blue3")
+    pointsColor = safe_style(config.pointsColor, "magenta2")
 
     accounts_sorted = sorted(accounts, key=lambda acc: not acc.get("login", True))
 

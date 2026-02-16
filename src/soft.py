@@ -10,11 +10,11 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse
 
-import yaml
 from playwright.async_api import BrowserContext
 from rich.color import Color, ColorParseError
 from rich.console import Console
 
+import config
 from autologin import (
     human_click_if_exists,
     input_mail,
@@ -63,6 +63,8 @@ def next_color() -> str:
     elif position <= 0:
         direction = 1
 
+    return color
+
 
 def safe_style(value: str | None, fallback: str = "#404040") -> str:
     if not value or str(value).lower() == "none":
@@ -70,26 +72,17 @@ def safe_style(value: str | None, fallback: str = "#404040") -> str:
 
     value = str(value).strip()
     try:
-        Color.parse(value)
+        _ = Color.parse(value)
         return value
     except ColorParseError:
         return fallback
 
 
-config_path = Path(__file__).parent.parent / "config.yaml"
-
-try:
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-except FileNotFoundError:
-    config = {}
+logColor = safe_style(config.logColor, "#404040")
+warnColor = safe_style(config.warnColor, "#b84c44")
 
 
-logColor = safe_style(config.get("logColor"), "#404040")
-warnColor = safe_style(config.get("warnColor"), "#b84c44")
-
-
-def _get_proxy_for_email(email: str) -> dict | None:
+def _get_proxy_for_email(email: str) -> dict[str, str] | None:
     path = Path(__file__).resolve().parent / "profiles.json"
     if not path.exists():
         return None
@@ -171,6 +164,7 @@ def update_points_and_log(email: str, points: int) -> None:
 
 
 async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> None:
+    _ = wait_for_close
     try:
         from playwright.async_api import async_playwright
     except Exception as exc:
@@ -276,7 +270,7 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
                             points_element = element
                     except Exception:
                         continue
-                await wait(5, 6)
+
                 if points_element:
                     current_points = await points_element.inner_text()
                     console.print(f"{email} | current points: {current_points}")

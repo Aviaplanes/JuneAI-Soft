@@ -1,5 +1,4 @@
 pywin32
-PyYAML
 rich
 InquirerPy
 playwright

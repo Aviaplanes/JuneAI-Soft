@@ -7,7 +7,6 @@ import json
 import os
 import re
 from email.header import decode_header
-from typing import Optional
 
 PROFILES_FILENAME = "profiles.json"
 
@@ -55,13 +54,13 @@ def _get_password_for_email(email: str, path: str = PROFILES_FILENAME) -> str:
 
 def get_code(
     email: str,
-    imap_host: Optional[str] = None,
-    imap_port: Optional[int] = None,
+    imap_host: str | None = None,
+    imap_port: int | None = None,
     mailbox: str = "INBOX",
     sender: str = "notify@wallet-tx.blockchain.com",
     search_limit: int = 100,
     profiles_path: str = PROFILES_FILENAME,
-) -> Optional[str]:
+) -> str | None:
     imap_password = _get_password_for_email(email, profiles_path)
     if not imap_password:
         raise RuntimeError(f"No imapPassword found for {email}")

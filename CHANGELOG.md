@@ -4,6 +4,8 @@
 
 ## [v2.1.7] - x
 - Replaced `config.yaml` with `config.py` for configuration. Eliminates `pyyaml` dependency, provides full type safety, IDE autocompletion, and instant error detection on typos
+- Changed gradient logic
+- Fixed "Limit reached" handler function
 
 ## [v2.1.6] - 7th February 2026
 - Added background auto-clicker for dismissing popup overlays (tour guide, cookie consent, modals) that block script actions. Automatically clicks close buttons as soon as they appear on the page
