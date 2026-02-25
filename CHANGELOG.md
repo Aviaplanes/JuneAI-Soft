@@ -2,6 +2,26 @@
 
 ---
 
+## [v3.0.0-beta] - 25th February 2026
+- **Migrated from Playwright to nodriver** — undetectable browser automation via Chrome DevTools Protocol. Bypasses Cloudflare, DataDome, and other anti-bot systems
+- No longer requires separate browser installation (`install_browser.bat` removed) — uses existing Google Chrome on your PC
+- Added `profile_utils.py` — extracted utility functions (proxy config, profile directories, points logging, gradient colors) into a separate module
+- Rewrote all browser interactions to use CDP (Chrome DevTools Protocol) directly: mouse movement, clicks, keyboard input, network interception
+- Rewrote `grind.py` — all element lookups, bounding box calculations, and click handlers now use JS `evaluate()` + CDP instead of Playwright API
+- Rewrote `auto_login.py` — human-like mouse movement and clicks now use CDP `dispatch_mouse_event` instead of Playwright mouse API
+- Rewrote `email_input.py` — email form input now uses React-compatible native value setter with proper event dispatching (`input`, `change`, `keyup`)
+- Rewrote `soft.py` — browser launch, login flow, network interception, and points watcher fully rewritten for nodriver
+- Changed network interception: response body is now parsed as tuple `(json_string, is_base64)` instead of Playwright's response object
+- Changed page closed detection: replaced `page.is_closed()` with async `evaluate("1")` check since nodriver has no built-in method
+- Changed element existence checks: replaced `page.query_selector()` with `page.evaluate()` + `document.querySelector()` for reliability
+- Improved login flow: now waits for login page to fully load before entering email, with multiple fallback selectors for email input field
+- Improved IMAP error handling: authentication failures no longer crash the script, displays clear error messages instead
+- Improved browser lifecycle: proper `browser.stop()` calls with delays between retry attempts to prevent port conflicts
+- Removed Playwright dependency (`playwright` package no longer required)
+- Removed `install_browser.bat` — no longer needed
+- Updated `requirements.txt` — replaced `playwright` with `nodriver`
+- Updated README with nodriver-specific documentation and Playwright vs nodriver comparison table
+
 ## [v2.1.7] - x
 - Replaced `config.yaml` with `config.py` for configuration. Eliminates `pyyaml` dependency, provides full type safety, IDE autocompletion, and instant error detection on typos
 - Changed gradient logic
