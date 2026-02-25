@@ -1,4 +1,3 @@
 nodriver
 rich
 InquirerPy
-pyyaml
