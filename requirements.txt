@@ -1,4 +1,4 @@
-pywin32
+nodriver
 rich
 InquirerPy
-playwright
+pyyaml
