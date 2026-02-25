@@ -3,7 +3,7 @@
 
 
 
-# <img src="icons/juneai.png" width="40" /> JuneAI Soft
+# <img src="icons/juneai.png" width="40" /> JuneAI Soft (playwright)
 
 ⚠️ **DISCLAIMER**  
 By using this software, you take full responsibility for your actions.  
