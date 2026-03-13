@@ -16,7 +16,6 @@ PROFILES_FILENAME = "profiles.json"
 
 
 def _decode_payload(msg: email.message.Message) -> str:
-    """Декодирует тело письма"""
     body = ""
 
     if msg.is_multipart():
@@ -48,7 +47,6 @@ def _decode_payload(msg: email.message.Message) -> str:
 
 
 def _decode_subject(msg: email.message.Message) -> str:
-    """Декодирует тему письма"""
     subject = msg.get("Subject", "")
     if not subject:
         return ""
@@ -67,7 +65,6 @@ def _decode_subject(msg: email.message.Message) -> str:
 
 
 def _get_password_for_email(email_addr: str, path: str = PROFILES_FILENAME) -> str:
-    """Получает IMAP пароль из profiles.json"""
     profiles_path = Path(path)
     if not profiles_path.exists():
         raise RuntimeError(f"Profile file not found: {path}")
@@ -86,14 +83,13 @@ def _get_password_for_email(email_addr: str, path: str = PROFILES_FILENAME) -> s
 
 
 def _parse_email_date(msg: email.message.Message) -> datetime | None:
-    """Парсит дату письма в UTC"""
     date_str = msg.get("Date", "")
     if not date_str:
         return None
 
     try:
         dt = parsedate_to_datetime(date_str)
-        # Конвертируем в UTC для сравнения
+
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         else:
@@ -105,7 +101,7 @@ def _parse_email_date(msg: email.message.Message) -> datetime | None:
 
 def get_code(
     email_addr: str,
-    sent_after: datetime | None = None,  # ← НОВЫЙ ПАРАМЕТР
+    sent_after: datetime | None = None,
     imap_host: str | None = None,
     imap_port: int | None = None,
     mailbox: str = "INBOX",
@@ -139,7 +135,6 @@ def get_code(
         if status != "OK":
             raise RuntimeError(f"Failed to open mailbox {mailbox}")
 
-        # Ищем письма от sender
         typ, data = imap.search(None, f'FROM "{sender}"')
         if typ != "OK":
             return None
@@ -148,11 +143,10 @@ def get_code(
         if not uids:
             return None
 
-        # Проверяем последние письма (от новых к старым)
         uids_to_check = uids[-search_limit:]
 
         for uid in reversed(uids_to_check):
-            # Получаем полное письмо
+
             res, fetched = imap.fetch(uid, "(RFC822)")
             if res != "OK" or not fetched or not fetched[0]:
                 continue
@@ -163,32 +157,25 @@ def get_code(
 
             msg = email.message_from_bytes(raw_email)
 
-            # ══════════════════════════════════════════════
-            # КЛЮЧЕВОЕ: Проверяем дату письма
-            # ══════════════════════════════════════════════
             if sent_after is not None:
                 email_date = _parse_email_date(msg)
 
                 if email_date is None:
-                    # Не можем распарсить дату — пропускаем письмо
+
                     continue
 
-                # Убеждаемся что sent_after тоже в UTC
                 if sent_after.tzinfo is None:
                     sent_after = sent_after.replace(tzinfo=timezone.utc)
 
-                # Пропускаем письма, отправленные ДО нажатия Continue
                 if email_date < sent_after:
                     continue
 
-            # Ищем код в Subject
             subject = _decode_subject(msg)
             if subject:
                 m = re.search(r"\b(\d{6})\b", subject)
                 if m:
                     return m.group(1)
 
-            # Ищем код в Body
             body = _decode_payload(msg)
             if body:
                 m = re.search(r"\b(\d{6})\b", body)

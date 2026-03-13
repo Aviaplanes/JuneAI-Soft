@@ -27,15 +27,13 @@ def test_imap(
         return result
 
     try:
-        # Подключение
+
         imap = imaplib.IMAP4_SSL(imap_host, imap_port)
         result["connection"] = True
 
-        # Логин
         imap.login(email, password)
         result["login"] = True
 
-        # Проверяем письма от Blockchain
         imap.select("INBOX", readonly=True)
         typ, data = imap.search(None, 'FROM "notify@wallet-tx.blockchain.com"')
         if typ == "OK":
@@ -53,11 +51,11 @@ def test_imap(
 
 
 def main():
-    # Читаем profiles.json
+
     profiles_path = Path("profiles.json")
 
     if not profiles_path.exists():
-        # Пробуем в родительской папке
+
         profiles_path = Path("../profiles.json")
 
     if not profiles_path.exists():
@@ -118,7 +116,6 @@ def main():
 
         print()
 
-    # Итоги
     print("=" * 70)
     print("SUMMARY")
     print("=" * 70)

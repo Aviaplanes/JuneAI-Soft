@@ -7,7 +7,7 @@ import asyncio
 import json
 from enum import Enum, auto
 from pathlib import Path
-from datetime import datetime, timezone  # ← Добавлено
+from datetime import datetime, timezone
 
 from playwright.async_api import Page
 from rich.console import Console
@@ -132,9 +132,6 @@ async def run_login_flow(
     set_login_false(email)
     state = LoginState.CLICK_SIGN_IN
 
-    # ══════════════════════════════════════════════
-    # Время нажатия Continue (для фильтрации писем)
-    # ══════════════════════════════════════════════
     code_request_time: datetime | None = None
 
     while state not in (LoginState.DONE, LoginState.FAILED):
@@ -143,7 +140,6 @@ async def run_login_flow(
 
         match state:
 
-            # ── 1. Нажать Sign in ──
             case LoginState.CLICK_SIGN_IN:
                 console.print(f"{email} | Clicking Sign in...", style=log_style)
                 try:
@@ -160,7 +156,6 @@ async def run_login_flow(
                     console.print(f"{email} | Sign in error: {e}", style=warn_style)
                     state = LoginState.FAILED
 
-            # ── 2. ТОЛЬКО ввести email ──
             case LoginState.INPUT_EMAIL:
                 console.print(f"{email} | Entering email...", style=log_style)
                 try:
@@ -177,14 +172,11 @@ async def run_login_flow(
                     console.print(f"{email} | Email input error: {e}", style=warn_style)
                     state = LoginState.FAILED
 
-            # ── 3. Нажать Continue после email ──
             case LoginState.CLICK_CONTINUE_EMAIL:
                 console.print(f"{email} | Clicking Continue...", style=log_style)
 
-                # ═══════════════════════════════════════════════════════
                 # ЗАПОМИНАЕМ ВРЕМЯ перед нажатием Continue!
                 # Все письма СТАРШЕ этого времени будут игнорироваться
-                # ═══════════════════════════════════════════════════════
                 code_request_time = datetime.now(timezone.utc)
                 console.print(
                     f"{email} | Code request time: {code_request_time.strftime('%H:%M:%S')} UTC",
@@ -202,7 +194,6 @@ async def run_login_flow(
                     await wait(2, 3)
                     state = LoginState.WAIT_CODE_FIELD
 
-            # ── 4. Ждать поле кода ──
             case LoginState.WAIT_CODE_FIELD:
                 console.print(f"{email} | Waiting for code field...", style=log_style)
                 try:
@@ -214,7 +205,6 @@ async def run_login_flow(
                     console.print(f"{email} | Code field not found", style=warn_style)
                     state = LoginState.FAILED
 
-            # ── 5. Получить код через IMAP и ввести ──
             case LoginState.FETCH_AND_INPUT_CODE:
                 console.print(
                     f"{email} | Waiting for verification code...", style=log_style
@@ -235,9 +225,6 @@ async def run_login_flow(
                         return LoginResult.PAGE_CLOSED
 
                     try:
-                        # ═══════════════════════════════════════════════════════
-                        # ПЕРЕДАЁМ sent_after — ищем только новые письма!
-                        # ═══════════════════════════════════════════════════════
                         code = get_code(email, sent_after=code_request_time)
 
                         if code:
@@ -276,7 +263,6 @@ async def run_login_flow(
                 await wait(0.5, 1)
                 state = LoginState.CLICK_CHECKBOX
 
-            # ── 6. Нажать checkbox ──
             case LoginState.CLICK_CHECKBOX:
                 console.print(f"{email} | Waiting for checkbox...", style=log_style)
                 clicked = False
@@ -299,7 +285,6 @@ async def run_login_flow(
                     console.print(f"{email} | Checkbox not found", style=warn_style)
                     state = LoginState.FAILED
 
-            # ── 7. Нажать Continue после кода ──
             case LoginState.CLICK_CONTINUE_CODE:
                 console.print(f"{email} | Clicking Submit...", style=log_style)
                 try:
@@ -311,7 +296,6 @@ async def run_login_flow(
                 await wait(2, 3)
                 state = LoginState.VERIFY_LOGIN
 
-            # ── 8. Проверить вход ──
             case LoginState.VERIFY_LOGIN:
                 console.print(f"{email} | Verifying login...", style=log_style)
                 try:
