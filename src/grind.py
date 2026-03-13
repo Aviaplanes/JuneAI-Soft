@@ -280,37 +280,69 @@ async def grind(page: Page, timeout: int, email: str, prompt_file: str) -> bool 
         await wait(0.24, 0.56)
 
         textarea_selector = None
-        for sel in [
-            'textarea[placeholder="Type your question here..."]',
-            'textarea[placeholder="Describe an image here..."]',
-            'textarea[placeholder="Describe a video here..."]',
-        ]:
+        max_retries = 3  # Количество попыток найти textarea
+
+        for attempt in range(max_retries):
             if page.is_closed():
                 return False
 
-            element = await page.query_selector(sel)
-            if not element:
-                continue
+            for sel in [
+                'textarea[placeholder="Type your question here..."]',
+                'textarea[placeholder="Describe an image here..."]',
+                'textarea[placeholder="Describe a video here..."]',
+            ]:
+                if page.is_closed():
+                    return False
 
-            cursor_style = cast(
-                str,
-                await page.evaluate(
-                    "(el) => window.getComputedStyle(el).cursor", element
-                ),
+                element = await page.query_selector(sel)
+                if not element:
+                    continue
+
+                cursor_style = cast(
+                    str,
+                    await page.evaluate(
+                        "(el) => window.getComputedStyle(el).cursor", element
+                    ),
+                )
+
+                if cursor_style == "not-allowed":
+                    console.print(
+                        "[WARN] Element is not clickable (cursor: not-allowed)",
+                        style=warnColor,
+                    )
+                    return False
+
+                textarea_selector = sel
+                break
+
+            if textarea_selector:
+                break
+
+            # Textarea не найден - пробуем нажать New Chat
+            console.print(
+                f"[INFO] {email} | Textarea not found, clicking New Chat (attempt {attempt + 1}/{max_retries})",
+                style=logColor,
             )
 
-            if cursor_style == "not-allowed":
+            if page.is_closed():
+                return False
+
+            new_chat_success = await new_chat(page)
+            if not new_chat_success:
                 console.print(
-                    "[WARN] Element is not clickable (cursor: not-allowed)",
+                    f"[WARN] {email} | Failed to click New Chat",
                     style=warnColor,
                 )
                 return False
 
-            textarea_selector = sel
-            break
+            # Ждём появления textarea после New Chat
+            await wait(1.0, 2.0)
 
         if not textarea_selector:
-            console.print("[WARN] No available textarea", style=warnColor)
+            console.print(
+                f"[WARN] {email} | No available textarea after {max_retries} attempts",
+                style=warnColor,
+            )
             return False
 
         if page.is_closed():

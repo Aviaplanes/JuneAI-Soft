@@ -1,5 +1,5 @@
 @echo off
-title June Soft v2.1.7 
+title June Soft v3.1.0-beta
 echo Starting...
 cd src
 set PYTHONDONTWRITEBYTECODE=1

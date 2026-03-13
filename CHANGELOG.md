@@ -2,6 +2,14 @@
 
 ---
 
+## [v3.1.0-beta] - 13th March 2026
+- Fixed page load race condition: script no longer crashes when DOM is ready but page content hasn't fully loaded
+- Fixed auto-login algorithm (critical)
+- Added test_all_imap.py — bulk IMAP validation tool
+- Refactored auto-login into a standalone module
+- Email verification codes are now fetched strictly after the request is dispatched, improving security
+- Added 1,500 new text prompts
+
 ## [v2.1.7] - x
 - Replaced `config.yaml` with `config.py` for configuration. Eliminates `pyyaml` dependency, provides full type safety, IDE autocompletion, and instant error detection on typos
 - Changed gradient logic

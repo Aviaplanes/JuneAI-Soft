@@ -165,23 +165,18 @@ def update_points_and_log(email: str, points: int) -> None:
 
 async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> None:
     _ = wait_for_close
+
     try:
         from playwright.async_api import async_playwright
     except Exception as exc:
         print(f"Error: {exc}")
         return
 
-    config_path = Path(__file__).parent.parent / "config.yaml"
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-    except FileNotFoundError:
-        config = {}
+    import config
 
-    retries = int(config.get("retries", 3))
-    attempt = 0
-    while attempt < retries:
-        attempt += 1
+    retries = config.retries
+
+    for attempt in range(1, retries + 1):
         context: BrowserContext | None = None
 
         try:
@@ -210,166 +205,163 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
 
                 page.set_default_timeout(30000)
 
+                # ── Перехват ответов для отслеживания поинтов ──
                 async def handle_response(response):
                     try:
-                        url = response.url
-                        if "points" in url:
-                            if response.headers.get("content-type", "").startswith(
-                                "application/json"
-                            ):
+                        if "points" in response.url:
+                            ct = response.headers.get("content-type", "")
+                            if ct.startswith("application/json"):
                                 data = await response.json()
                                 if isinstance(data, dict) and "points" in data:
-                                    points = int(data["points"])
-                                    update_points_and_log(email, points)
+                                    update_points_and_log(email, int(data["points"]))
                     except Exception:
                         pass
 
                 page.on("response", handle_response)
 
+                # ══════════════════════════════════════════════════════════
+                # ЗАГРУЗКА СТРАНИЦЫ (с защитой от зависания)
+                # ══════════════════════════════════════════════════════════
+                page_loaded = False
+
+                # Попытка 1: domcontentloaded (быстрее, не ждёт все ресурсы)
                 try:
-                    await page.goto("https://askjune.ai/app/chat")
+                    console.print(f"{email} | Loading page...", style=logColor)
+                    await page.goto(
+                        "https://askjune.ai/app/chat",
+                        wait_until="domcontentloaded",
+                        timeout=20000,
+                    )
+                    page_loaded = True
                 except Exception:
                     console.print(
-                        f"{email} | Page did not load, retry {attempt}/{retries}",
-                        style=warnColor,
+                        f"{email} | DOM load timeout, trying minimal load...",
+                        style=logColor,
                     )
+
+                # Попытка 2: commit (минимум — только начало ответа сервера)
+                if not page_loaded:
+                    try:
+                        await page.goto(
+                            "https://askjune.ai/app/chat",
+                            wait_until="commit",
+                            timeout=15000,
+                        )
+                        page_loaded = True
+                    except Exception:
+                        pass
+
+                # Попытка 3: просто открыть и ждать элемент
+                if not page_loaded:
+                    try:
+                        await page.goto("https://askjune.ai/app/chat", timeout=10000)
+                        page_loaded = True
+                    except Exception:
+                        console.print(
+                            f"{email} | Page did not load, retry {attempt}/{retries}",
+                            style=warnColor,
+                        )
+                        await context.close()
+                        continue
+
+                # Ждём появления ключевых элементов (Sign in ИЛИ points)
+                console.print(f"{email} | Waiting for page elements...", style=logColor)
+                try:
+                    await page.wait_for_selector(
+                        'button:has-text("Sign in"), span.tabular-nums',
+                        state="visible",
+                        timeout=20000,
+                    )
+                except Exception:
+                    # Может страница ещё грузится — пробуем подождать и перезагрузить
+                    console.print(
+                        f"{email} | Elements not visible, reloading...",
+                        style=logColor,
+                    )
+                    try:
+                        await page.reload(wait_until="domcontentloaded", timeout=15000)
+                        await page.wait_for_selector(
+                            'button:has-text("Sign in"), span.tabular-nums',
+                            state="visible",
+                            timeout=15000,
+                        )
+                    except Exception:
+                        console.print(
+                            f"{email} | Key elements not found, retry {attempt}/{retries}",
+                            style=warnColor,
+                        )
+                        await context.close()
+                        continue
+
+                console.print(f"{email} | Page loaded successfully", style=logColor)
+
+                # ══════════════════════════════════════════════════════════
+                # ОСТАЛЬНОЙ КОД БЕЗ ИЗМЕНЕНИЙ
+                # ══════════════════════════════════════════════════════════
+
+                # ── Фоновое закрытие туров ──
+                tour_task = asyncio.create_task(dismiss_tour_overlay(page))
+
+                # ── Автологин ──
+                from login_flow import run_login_flow, LoginResult
+
+                login_result = await run_login_flow(
+                    page, email, log_style=logColor, warn_style=warnColor
+                )
+
+                can_grind = login_result in (
+                    LoginResult.ALREADY_LOGGED_IN,
+                    LoginResult.LOGIN_SUCCESS,
+                )
+
+                if login_result == LoginResult.PAGE_CLOSED:
+                    tour_task.cancel()
                     await context.close()
                     continue
 
-                tour_task = asyncio.create_task(dismiss_tour_overlay(page))
-
-                points_selector = "span.tabular-nums"
-                signin_selector = 'button:has-text("Sign in")'
-
-                points_task = asyncio.create_task(
-                    page.wait_for_selector(points_selector, state="visible")
-                )
-                signin_task = asyncio.create_task(
-                    page.wait_for_selector(signin_selector, state="visible")
-                )
-
-                done, pending = await asyncio.wait(
-                    [points_task, signin_task], return_when=asyncio.FIRST_COMPLETED
-                )
-
-                for task in pending:
-                    task.cancel()
-
-                points_element = None
-                signin_element = None
-
-                for task in done:
-                    try:
-                        element = task.result()
-                        if not element:
-                            continue
-                        tag_text = await element.text_content() or ""
-                        if "Sign in" in tag_text:
-                            signin_element = element
-                        else:
-                            points_element = element
-                    except Exception:
-                        continue
-
-                if points_element:
-                    current_points = await points_element.inner_text()
-                    console.print(f"{email} | current points: {current_points}")
-                    set_login_true(email)
-                    can_grind = True
-
-                elif signin_element:
-                    set_login_false(email)
-                    await signin_element.click()
-                    await input_mail(page, email)
-                    await human_click_if_exists(
-                        page, 'input[aria-label="Verification code"]'
-                    )
-                    await wait(7, 9)
-
-                    with open("profiles.json", "r", encoding="utf-8") as f:
-                        profiles = json.load(f)
-                    profile = next(
-                        (p for p in profiles if p.get("email") == email), None
-                    )
-                    if profile and "imapPassword" in profile:
-                        try:
-                            code = get_code(email)
-                            await type(page, code or "")
-                            await key_press(page, "Enter")
-                        except RuntimeError as e:
-                            if "imapPassword not found" in str(e):
-                                console.print(
-                                    f"{email} imap is not connected", style=logColor
-                                )
-                            else:
-                                raise
-
-                    try:
-                        await page.wait_for_selector(
-                            "span.tabular-nums", state="visible", timeout=30000
-                        )
-                        current_points = await page.inner_text("span.tabular-nums")
-                        console.print(f"{email} | logged in, points: {current_points}")
-                        set_login_true(email)
-                        can_grind = True
-                    except Exception:
-                        console.print(
-                            f"{email} | Login failed, points not found",
-                            style=warnColor,
-                        )
-                        can_grind = False
-
-                else:
-                    console.print(
-                        f"{email} | Element 'points' and 'Sign in' button not found",
-                        style=warnColor,
-                    )
-                    if context is not None:
-                        await context.close()
-                    continue
-
-                await page.evaluate("(email) => { document.title = email; }", email)
-
-                await page.evaluate(
-                    r"""
-                (() => {
-                    if (window.__pointsWatcherInstalled) return;
-                    window.__pointsWatcherInstalled = true;
-                    const selectors = ['.text-arcticNights .tabular-nums', 'span.tabular-nums'];
-                    const pick = () => { for (const s of selectors) { const el = document.querySelector(s); if (el) return el; } return null; };
-                    const parse = el => { if (!el) return null; const raw = el.textContent || ''; const n = parseInt(raw.replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null; };
-                    const notify = v => { try { window.pyPointsUpdate && window.pyPointsUpdate(v); } catch(e) {} };
-                    let observedEl = null; let lastVal = null; let obs = null;
-                    const attach = () => {
-                        const el = pick();
-                        if (!el || el === observedEl) return;
-                        if (obs && observedEl) { try { obs.disconnect(); } catch(_) {} }
-                        observedEl = el;
-                        const sendNow = () => { const v = parse(observedEl); if (v != null && v !== lastVal) { lastVal = v; notify(v); } };
-                        obs = new MutationObserver(sendNow);
-                        obs.observe(observedEl, { childList: true, characterData: true, subtree: true });
-                        sendNow();
-                    };
-                    const rootObs = new MutationObserver(attach);
-                    rootObs.observe(document.documentElement, { childList: true, subtree: true });
-                    const poll = () => { attach(); if (observedEl) { const v = parse(observedEl); if (v != null && v !== lastVal) { lastVal = v; notify(v); } } };
-                    setInterval(poll, 1000); attach(); poll();
-                })();
-                """
-                )
-
-                page_closed = asyncio.Event()
-                page.on("close", lambda: page_closed.set())
-
-                # ===== ГРИНД ТОЛЬКО ЕСЛИ ЗАЛОГИНЕН =====
-                if can_grind:
-                    result = await main(page, email)
-                else:
+                if not can_grind:
                     console.print(
                         f"{email} | Skipping grind — not logged in",
                         style=warnColor,
                     )
-                    result = None
+                    tour_task.cancel()
+                    await context.close()
+                    continue
+
+                # ── Настройка страницы ──
+                await page.evaluate("(e) => { document.title = e; }", email)
+                await page.evaluate(
+                    r"""
+                    (() => {
+                        if (window.__pointsWatcherInstalled) return;
+                        window.__pointsWatcherInstalled = true;
+                        const selectors = ['.text-arcticNights .tabular-nums', 'span.tabular-nums'];
+                        const pick = () => { for (const s of selectors) { const el = document.querySelector(s); if (el) return el; } return null; };
+                        const parse = el => { if (!el) return null; const raw = el.textContent || ''; const n = parseInt(raw.replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null; };
+                        const notify = v => { try { window.pyPointsUpdate && window.pyPointsUpdate(v); } catch(e) {} };
+                        let observedEl = null; let lastVal = null; let obs = null;
+                        const attach = () => {
+                            const el = pick();
+                            if (!el || el === observedEl) return;
+                            if (obs && observedEl) { try { obs.disconnect(); } catch(_) {} }
+                            observedEl = el;
+                            const sendNow = () => { const v = parse(observedEl); if (v != null && v !== lastVal) { lastVal = v; notify(v); } };
+                            obs = new MutationObserver(sendNow);
+                            obs.observe(observedEl, { childList: true, characterData: true, subtree: true });
+                            sendNow();
+                        };
+                        const rootObs = new MutationObserver(attach);
+                        rootObs.observe(document.documentElement, { childList: true, subtree: true });
+                        const poll = () => { attach(); if (observedEl) { const v = parse(observedEl); if (v != null && v !== lastVal) { lastVal = v; notify(v); } } };
+                        setInterval(poll, 1000); attach(); poll();
+                    })();
+                    """
+                )
+
+                # ── Гринд ──
+                result = await main(page, email)
+
+                # ── Очистка ──
                 tour_task.cancel()
                 try:
                     await tour_task
@@ -377,16 +369,15 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
                     pass
 
                 if result == "close":
-                    console.print(f"[INFO] {email} | Farming completed", style=logColor)
-                    break
+                    console.print(f"{email} | Farming completed", style=logColor)
 
                 break
 
         except Exception as e:
             console.print(
-                f"{email} | Error on attempt {attempt}/{retries}: {e}", style=warnColor
+                f"{email} | Error on attempt {attempt}/{retries}: {e}",
+                style=warnColor,
             )
-
             if context is not None:
                 try:
                     await context.close()
@@ -394,10 +385,7 @@ async def _run_farm_profile_async(email: str, wait_for_close: bool = True) -> No
                     pass
 
             if attempt >= retries:
-                console.print(
-                    f"{email} | All attempts exhausted",
-                    style=warnColor,
-                )
+                console.print(f"{email} | All attempts exhausted", style=warnColor)
 
 
 def run_farm_profile(email: str, wait_for_close: bool = True) -> None:
@@ -443,11 +431,11 @@ async def _run_profile_async(email: str, wait_for_close: bool = True) -> None:
 
         page = context.pages[0] if context.pages else await context.new_page()
 
+        # --- Отслеживание поинтов через перехват ответов ---
         async def safe_parse_json(response):
             try:
                 text = await response.text()
                 text = text.strip()
-
                 if not text or text.startswith("event:") or text[0] not in "{[":
                     return None
                 return json.loads(text)
@@ -460,53 +448,30 @@ async def _run_profile_async(email: str, wait_for_close: bool = True) -> None:
                 if "points" in url:
                     content_type = response.headers.get("content-type", "")
                     if content_type.startswith("application/json"):
-                        try:
-                            data = await safe_parse_json(response)
-                            if isinstance(data, dict) and "points" in data:
-                                points = int(data["points"])
-                                update_points_and_log(email, points)
-                        except Exception as e_json:
-                            print(f"[ERROR] JSON ошибка {url}: {e_json}")
-                            text = await response.text()
-                            print(f"[DEBUG] Ответ:\n{text}")
-            except Exception as e:
-                print(f"[ERROR] handle_response: {e}")
-                import traceback
-
-                traceback.print_exc()
+                        data = await safe_parse_json(response)
+                        if isinstance(data, dict) and "points" in data:
+                            points = int(data["points"])
+                            update_points_and_log(email, points)
+            except Exception:
+                pass
 
         page.on("response", handle_response)
+
         await page.goto("https://askjune.ai/app/chat")
 
+        # --- Проверка статуса логина ---
         button = await page.query_selector('button:has-text("Sign in")')
         if button:
             set_login_false(email)
         else:
             set_login_true(email)
+            try:
+                current_points = await page.inner_text("span.tabular-nums")
+                console.print(f"{email} | current points: {current_points}")
+            except Exception:
+                pass
 
-            current_points = await page.inner_text("span.tabular-nums")
-            console.print(f"{email} | current points: " + current_points)
-
-        clicked = await human_click_if_exists(page, 'button:has-text("Sign in")')
-        if clicked:
-            await input_mail(page, email)
-            await human_click_if_exists(page, 'input[aria-label="Verification code"]')
-            await wait(7, 10)
-
-            with open("profiles.json", "r", encoding="utf-8") as f:
-                profiles = json.load(f)
-            profile = next((p for p in profiles if p.get("email") == email), None)
-            if profile and "imapPassword" in profile:
-                try:
-                    code = get_code(email)
-                    await type(page, code or "")
-                    await key_press(page, "Enter")
-                except RuntimeError as e:
-                    if "не найден imapPassword" in str(e):
-                        console.print(f"{email} imap is not connected", style=logColor)
-                    else:
-                        raise
-
+        # --- JS-watcher для поинтов ---
         async def _py_points_update(value: int | None = None):
             if value is None:
                 return
@@ -524,52 +489,46 @@ async def _run_profile_async(email: str, wait_for_close: bool = True) -> None:
         await page.evaluate(
             r"""
         (() => {
-        if (window.__pointsWatcherInstalled) return;
-        window.__pointsWatcherInstalled = true;
-        const selectors = ['.text-arcticNights .tabular-nums', 'span.tabular-nums'];
-        const pick = () => {
-            for (const s of selectors) { const el = document.querySelector(s); if (el) return el; }
-            return null;
-          };
-          const parse = el => {
-            if (!el) return null;
-            const raw = el.textContent || '';
-            const n = parseInt(raw.replace(/\D/g, ''), 10);
-            return Number.isFinite(n) ? n : null;
-          };
-          const notify = v => { try { window.pyPointsUpdate && window.pyPointsUpdate(v); } catch(e) {} };
-          let observedEl = null; let lastVal = null; let obs = null;
-          const attach = () => {
-            const el = pick();
-            if (!el || el === observedEl) return;
-            if (obs && observedEl) { try { obs.disconnect(); } catch(_) {} }
-            observedEl = el;
-            const sendNow = () => { const v = parse(observedEl); if (v != null && v !== lastVal) { lastVal = v; notify(v); } };
-            obs = new MutationObserver(sendNow);
-            obs.observe(observedEl, { childList: true, characterData: true, subtree: true });
-            sendNow();
-          };
-          const rootObs = new MutationObserver(attach);
-          rootObs.observe(document.documentElement, { childList: true, subtree: true });
-          const poll = () => {
+            if (window.__pointsWatcherInstalled) return;
+            window.__pointsWatcherInstalled = true;
+            const selectors = ['.text-arcticNights .tabular-nums', 'span.tabular-nums'];
+            const pick = () => {
+                for (const s of selectors) { const el = document.querySelector(s); if (el) return el; }
+                return null;
+            };
+            const parse = el => {
+                if (!el) return null;
+                const raw = el.textContent || '';
+                const n = parseInt(raw.replace(/\D/g, ''), 10);
+                return Number.isFinite(n) ? n : null;
+            };
+            const notify = v => { try { window.pyPointsUpdate && window.pyPointsUpdate(v); } catch(e) {} };
+            let observedEl = null; let lastVal = null; let obs = null;
+            const attach = () => {
+                const el = pick();
+                if (!el || el === observedEl) return;
+                if (obs && observedEl) { try { obs.disconnect(); } catch(_) {} }
+                observedEl = el;
+                const sendNow = () => { const v = parse(observedEl); if (v != null && v !== lastVal) { lastVal = v; notify(v); } };
+                obs = new MutationObserver(sendNow);
+                obs.observe(observedEl, { childList: true, characterData: true, subtree: true });
+                sendNow();
+            };
+            const rootObs = new MutationObserver(attach);
+            rootObs.observe(document.documentElement, { childList: true, subtree: true });
+            const poll = () => {
+                attach();
+                if (observedEl) {
+                    const v = parse(observedEl);
+                    if (v != null && v !== lastVal) { lastVal = v; notify(v); }
+                }
+            };
+            setInterval(poll, 1000);
             attach();
-            if (observedEl) {
-              const v = parse(observedEl);
-              if (v != null && v !== lastVal) { lastVal = v; notify(v); }
-            }
-          };
-          setInterval(poll, 1000);
-          attach();
-          poll();
+            poll();
         })();
         """
         )
-
-        button = await page.query_selector('button:has-text("Sign in")')
-        if button:
-            set_login_false(email)
-        else:
-            set_login_true(email)
 
         if wait_for_close:
             context.set_default_timeout(0)
